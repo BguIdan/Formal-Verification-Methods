@@ -398,7 +398,11 @@ public class FvmFacadeImpl implements FvmFacade {
 
     @Override
     public <L, A> TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystemFromProgramGraph(ProgramGraph<L, A> pg, Set<ActionDef> actionDefs, Set<ConditionDef> conditionDefs) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement transitionSystemFromProgramGraph
+    	TransitionSystem ansTs = createTransitionSystem();
+    	Set<L> locations = pg.getLocations();
+    	//addToAtomicPropositions(locations, ansTs);
+    	
+    	throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement transitionSystemFromProgramGraph
     }
 
     @Override
