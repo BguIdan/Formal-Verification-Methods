@@ -91,7 +91,7 @@ public class TransitionSystemImpl<STATE, ACTION, ATOMIC_PROPOSITION> implements 
 
 	@Override
 	public Set<ACTION> getActions() {
-		return actions;
+		return new HashSet<ACTION>(actions);
 	}
 
 	@Override
@@ -101,7 +101,7 @@ public class TransitionSystemImpl<STATE, ACTION, ATOMIC_PROPOSITION> implements 
 
 	@Override
 	public Set<ATOMIC_PROPOSITION> getAtomicPropositions() {
-		return ap;
+		return new HashSet<ATOMIC_PROPOSITION>(ap);
 	}
 
 	@Override
@@ -116,13 +116,13 @@ public class TransitionSystemImpl<STATE, ACTION, ATOMIC_PROPOSITION> implements 
 	@Override
 	public Set<ATOMIC_PROPOSITION> getLabel(STATE s) {
 		if(states.contains(s))
-			return taggedStates.get(s);
+			return new HashSet<ATOMIC_PROPOSITION>(taggedStates.get(s));
 		else throw new StateNotFoundException(s);
 	}
 
 	@Override
 	public Set<STATE> getInitialStates() {
-		return initStates;
+		return new HashSet<STATE>(initStates);
 	}
 
 	@Override
@@ -132,12 +132,12 @@ public class TransitionSystemImpl<STATE, ACTION, ATOMIC_PROPOSITION> implements 
 
 	@Override
 	public Set<STATE> getStates() {
-		return states;
+		return new HashSet<STATE>(states);
 	}
 
 	@Override
 	public Set<Transition<STATE, ACTION>> getTransitions() {
-		return transitions;
+		return new HashSet<Transition<STATE, ACTION>>(transitions);
 	}
 
 	@Override
