@@ -250,12 +250,14 @@ public class FvmFacadeImpl implements FvmFacade {
         for(S s : reachableStates){
         	unreachables.remove(s);
         }
+        Set<S> initialStates = ts.getInitialStates();
+        Map<S, Set<P>> labeling = ts.getLabelingFunction();
         Set<Transition<S,A>> transitions = ts.getTransitions();
         for (S s : unreachables) {
-            if (ts.getInitialStates().contains(s)) {
+            if (initialStates.contains(s)) {
                 ts.removeInitialState(s);
             }
-            Set<P> labelsOfState = ts.getLabelingFunction().get(s);
+            Set<P> labelsOfState = labeling.get(s);
             if (labelsOfState != null && labelsOfState.size() > 0) {
                 for (P l : labelsOfState) {
                     ts.removeLabel(s, l);
@@ -396,7 +398,11 @@ public class FvmFacadeImpl implements FvmFacade {
 
     @Override
     public <L, A> TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystemFromProgramGraph(ProgramGraph<L, A> pg, Set<ActionDef> actionDefs, Set<ConditionDef> conditionDefs) {
-        throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement transitionSystemFromProgramGraph
+    	TransitionSystem ansTs = createTransitionSystem();
+    	Set<L> locations = pg.getLocations();
+    	//addToAtomicPropositions(locations, ansTs);
+    	
+    	throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement transitionSystemFromProgramGraph
     }
 
     @Override
