@@ -4,6 +4,8 @@ import il.ac.bgu.cs.fvm.FvmFacade;
 import il.ac.bgu.cs.fvm.automata.Automaton;
 import il.ac.bgu.cs.fvm.channelsystem.ChannelSystem;
 import il.ac.bgu.cs.fvm.circuits.Circuit;
+import il.ac.bgu.cs.fvm.examples.VendingMachineBuilder.ACTION;
+import il.ac.bgu.cs.fvm.examples.VendingMachineBuilder.STATE;
 import il.ac.bgu.cs.fvm.exceptions.ActionNotFoundException;
 import il.ac.bgu.cs.fvm.exceptions.StateNotFoundException;
 import il.ac.bgu.cs.fvm.programgraph.ActionDef;
@@ -15,12 +17,14 @@ import il.ac.bgu.cs.fvm.transitionsystem.TransitionSystem;
 import il.ac.bgu.cs.fvm.util.Pair;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 
 /**
  * Implement the methods in this class. You may add additional classes as you
@@ -235,7 +239,37 @@ public class FvmFacadeImpl implements FvmFacade {
     /*******************************************************
      ************ 		HW1 Ends Here!         *************
      *******************************************************/
+	private <S, A, P>  void removeUnreachableStates(TransitionSystem<S, A, P> ts) {
 
+        Set<S> reachableStates = reach(ts);
+        Set<S> allStates = ts.getStates();
+        Set<S> unreachables = new HashSet<>();
+        for(S s : allStates){
+        	unreachables.add(s);
+        }
+        for(S s : reachableStates){
+        	unreachables.remove(s);
+        }
+        Set<Transition<S,A>> transitions = ts.getTransitions();
+        for (S s : unreachables) {
+            if (ts.getInitialStates().contains(s)) {
+                ts.removeInitialState(s);
+            }
+            Set<P> labelsOfState = ts.getLabelingFunction().get(s);
+            if (labelsOfState != null && labelsOfState.size() > 0) {
+                for (P l : labelsOfState) {
+                    ts.removeLabel(s, l);
+                }
+            }
+            for (Transition t : transitions) {
+                if (t.getFrom().equals(s) || t.getTo().equals(s)) {
+                    ts.removeTransition(t);
+                }
+            }
+            ts.removeState(s);
+        }
+    }
+	
     @Override
     public <S1, S2, A, P> TransitionSystem<Pair<S1, S2>, A, P> interleave(TransitionSystem<S1, A, P> ts1, TransitionSystem<S2, A, P> ts2) {
         throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement interleave
@@ -256,22 +290,108 @@ public class FvmFacadeImpl implements FvmFacade {
         throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement interleave
     }
 
-    @Override
-    public TransitionSystem<Pair<List<Boolean>, List<Boolean>>, List<Boolean>, Object> transitionSystemFromCircuit(Circuit c) {
-    	TransitionSystem<Pair<List<Boolean>, List<Boolean>>, List<Boolean>, Object> ansTs = new TransitionSystemImpl<>();
-    	List<String> inputs = c.getInputPortNames();
-        List<String> registers = c.getRegisterNames();
-        
-        
-    	throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement transitionSystemFromCircuit
+    private void addToAtomicPropositions(List<String> toAdd, TransitionSystem ts){
+    	for(int i = 0; i < toAdd.size(); i++){
+    		ts.addAtomicProposition(toAdd.get(i));
+    	}
     }
     
-    private void genStates(List<String> in, List<String>reg, TransitionSystem<Pair<List<Boolean>, List<Boolean>>, List<Boolean>, Object> ts){
-    	for (int i = 0; i < in.size(); i++){
-    		for(int j = 0; j < reg.size();j++){
-    			
+    private void addToLabels(Pair<List<Boolean>, List<Boolean>> state,List<String> toAdd, List<Boolean> toCheck, TransitionSystem ts){
+    	for(int i = 0; i < toCheck.size(); i++){
+    		if(toCheck.get(i)){
+    			ts.addToLabel(state, toAdd.get(i));
     		}
     	}
+    }
+    
+    private String convertToBinary(int numToConvert, int length){
+		String ans = "";
+	    for ( int i = 0; i < length; i++,numToConvert /= 2) {
+	        ans = numToConvert % 2+ans;
+	    }
+	    return ans;
+	}
+    
+    private Set<List<Boolean>> namesToBooleans(List<String> toChange, int n){
+    	Set<List<Boolean>> ans = new HashSet<>();
+    	for(int i = 0; i < Math.pow(2,n); i++){
+			String stateName = convertToBinary(i,n);
+			char[] chars = stateName.toCharArray();
+            List<Boolean> lst = new ArrayList<Boolean>();
+            for (int j = 0; j < chars.length; j++) {
+                lst.add(chars[j] == '0' ? false : true);
+            }
+            ans.add(lst);
+		}
+    	
+    	return ans;
+    }
+    
+    private void genStatesAndLabels(Circuit cs, TransitionSystem ts, List<String> inputsLst, List<String> registersLst, List<String> outputs){
+    	Set<List<Boolean>> inputs = namesToBooleans(cs.getInputPortNames(), cs.getInputPortNames().size());
+    	Set<List<Boolean>> registers = namesToBooleans(cs.getRegisterNames(), cs.getRegisterNames().size()); 	
+    	for(List<Boolean> input : inputs){
+    		for(List<Boolean> register : registers){
+    			Pair<List<Boolean>, List<Boolean>> state = new Pair(register, input);
+    			ts.addState(state);
+    			
+    			addToLabels(state, inputsLst, input, ts);
+    			addToLabels(state, registersLst, register, ts);
+    			List<Boolean> compOutputs = cs.computeOutputs(register, input);
+    			addToLabels(state, outputs, compOutputs, ts);
+    		}
+    	}
+    }
+    
+    private void addInitialStateToTs(Set<List<Boolean>> inputsOptions, List<Boolean> initReg, TransitionSystem ts){
+    	for(List<Boolean> lst : inputsOptions){
+    		Pair<List<Boolean>, List<Boolean>> initState = new Pair(initReg, lst);
+    		ts.addInitialState(initState);
+    	}
+    }
+    
+    private void addActionsToTs(Set<List<Boolean>> inputsOptions, TransitionSystem ts){
+    	for(List<Boolean> lst : inputsOptions){
+    		ts.addAction(lst);
+    	}
+    }
+    
+    
+    private void addTransitionsToTs(Circuit cs, TransitionSystem ts){
+    	Set<List<Boolean>> inputs = namesToBooleans(cs.getInputPortNames(), cs.getInputPortNames().size());
+    	Set<List<Boolean>> registers = namesToBooleans(cs.getRegisterNames(), cs.getRegisterNames().size());
+    	for (List<Boolean> input : inputs) {
+            for (List<Boolean> register : registers) {
+                for (List<Boolean> action : inputs) {
+                    Pair<List<Boolean>, List<Boolean>> fromState = new Pair(register, input);
+                    Pair<List<Boolean>, List<Boolean>> toState = new Pair(cs.updateRegisters(register, input) ,action);
+                    Transition trans = new Transition(fromState, action,toState);
+                    ts.addTransition(trans);
+                }
+            }
+        }
+    }
+    
+    @Override
+    public TransitionSystem<Pair<List<Boolean>, List<Boolean>>, List<Boolean>, Object> transitionSystemFromCircuit(Circuit c) {
+    	TransitionSystem ansTs = createTransitionSystem();
+    	List<String> inputs = c.getInputPortNames();
+        List<String> registers = c.getRegisterNames();
+        List<String> outputs = c.getOutputPortNames();
+        addToAtomicPropositions(inputs, ansTs);
+        addToAtomicPropositions(registers, ansTs);
+        addToAtomicPropositions(outputs, ansTs);
+        
+        genStatesAndLabels(c, ansTs, inputs, registers, outputs);
+        
+        Set<List<Boolean>> boolInputs = namesToBooleans(c.getInputPortNames(), c.getInputPortNames().size());
+        List <Boolean> initReg = new ArrayList<Boolean>(Collections.nCopies(registers.size(), false));
+        addInitialStateToTs(boolInputs, initReg, ansTs);
+        addActionsToTs(boolInputs, ansTs);
+    	addTransitionsToTs(c, ansTs);
+    	
+    	removeUnreachableStates(ansTs);
+    	return ansTs;
     }
 
     @Override
