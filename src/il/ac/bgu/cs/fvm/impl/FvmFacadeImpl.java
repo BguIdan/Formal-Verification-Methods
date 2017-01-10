@@ -293,13 +293,13 @@ public class FvmFacadeImpl implements FvmFacade {
 		throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement interleave
 	}
 
-	private void addToAtomicPropositions(List<String> toAdd, TransitionSystem ts){
+	private void addToAtomicPropositions(List<String> toAdd, TransitionSystem<Pair<List<Boolean>, List<Boolean>>, List<Boolean>, Object> ts){
 		for(int i = 0; i < toAdd.size(); i++){
 			ts.addAtomicProposition(toAdd.get(i));
 		}
 	}
 
-	private void addToLabels(Pair<List<Boolean>, List<Boolean>> state,List<String> toAdd, List<Boolean> toCheck, TransitionSystem ts){
+	private void addToLabels(Pair<List<Boolean>, List<Boolean>> state,List<String> toAdd, List<Boolean> toCheck, TransitionSystem<Pair<List<Boolean>, List<Boolean>>, List<Boolean>, Object> ts){
 		for(int i = 0; i < toCheck.size(); i++){
 			if(toCheck.get(i)){
 				ts.addToLabel(state, toAdd.get(i));
@@ -330,14 +330,14 @@ public class FvmFacadeImpl implements FvmFacade {
 		return ans;
 	}
 
-	private void genStatesAndLabels(Circuit cs, TransitionSystem ts, List<String> inputsLst, List<String> registersLst, List<String> outputs){
+	private void genStatesAndLabels(Circuit cs, TransitionSystem<Pair<List<Boolean>, List<Boolean>>, List<Boolean>, Object> ts,
+			List<String> inputsLst, List<String> registersLst, List<String> outputs){
 		Set<List<Boolean>> inputs = namesToBooleans(cs.getInputPortNames(), cs.getInputPortNames().size());
 		Set<List<Boolean>> registers = namesToBooleans(cs.getRegisterNames(), cs.getRegisterNames().size()); 	
 		for(List<Boolean> input : inputs){
 			for(List<Boolean> register : registers){
-				Pair<List<Boolean>, List<Boolean>> state = new Pair(register, input);
+				Pair<List<Boolean>, List<Boolean>> state = new Pair<List<Boolean>, List<Boolean>>(register, input);
 				ts.addState(state);
-
 				addToLabels(state, inputsLst, input, ts);
 				addToLabels(state, registersLst, register, ts);
 				List<Boolean> compOutputs = cs.computeOutputs(register, input);
@@ -346,29 +346,30 @@ public class FvmFacadeImpl implements FvmFacade {
 		}
 	}
 
-	private void addInitialStateToTs(Set<List<Boolean>> inputsOptions, List<Boolean> initReg, TransitionSystem ts){
+	private void addInitialStateToTs(Set<List<Boolean>> inputsOptions, List<String> registers, TransitionSystem<Pair<List<Boolean>, List<Boolean>>, List<Boolean>, Object> ts){
 		for(List<Boolean> lst : inputsOptions){
-			Pair<List<Boolean>, List<Boolean>> initState = new Pair(initReg, lst);
+			List<Boolean> initReg = new ArrayList<Boolean>(Collections.nCopies(registers.size(), false));
+			Pair<List<Boolean>, List<Boolean>> initState = new Pair<List<Boolean>, List<Boolean>>(initReg, lst);
 			ts.addInitialState(initState);
 		}
 	}
 
-	private void addActionsToTs(Set<List<Boolean>> inputsOptions, TransitionSystem ts){
+	private void addActionsToTs(Set<List<Boolean>> inputsOptions, TransitionSystem<Pair<List<Boolean>, List<Boolean>>, List<Boolean>, Object> ts){
 		for(List<Boolean> lst : inputsOptions){
 			ts.addAction(lst);
 		}
 	}
 
 
-	private void addTransitionsToTs(Circuit cs, TransitionSystem ts){
+	private void addTransitionsToTs(Circuit cs, TransitionSystem<Pair<List<Boolean>, List<Boolean>>, List<Boolean>, Object> ts){
 		Set<List<Boolean>> inputs = namesToBooleans(cs.getInputPortNames(), cs.getInputPortNames().size());
 		Set<List<Boolean>> registers = namesToBooleans(cs.getRegisterNames(), cs.getRegisterNames().size());
 		for (List<Boolean> input : inputs) {
 			for (List<Boolean> register : registers) {
 				for (List<Boolean> action : inputs) {
-					Pair<List<Boolean>, List<Boolean>> fromState = new Pair(register, input);
-					Pair<List<Boolean>, List<Boolean>> toState = new Pair(cs.updateRegisters(register, input) ,action);
-					Transition trans = new Transition(fromState, action,toState);
+					Pair<List<Boolean>, List<Boolean>> fromState = new Pair<List<Boolean>, List<Boolean>>(register, input);
+					Pair<List<Boolean>, List<Boolean>> toState = new Pair<List<Boolean>, List<Boolean>>(cs.updateRegisters(register, input) ,action);
+					Transition trans = new Transition(fromState, action, toState);
 					ts.addTransition(trans);
 				}
 			}
@@ -377,22 +378,18 @@ public class FvmFacadeImpl implements FvmFacade {
 
 	@Override
 	public TransitionSystem<Pair<List<Boolean>, List<Boolean>>, List<Boolean>, Object> transitionSystemFromCircuit(Circuit c) {
-		TransitionSystem ansTs = createTransitionSystem();
+		TransitionSystem<Pair<List<Boolean>, List<Boolean>>, List<Boolean>, Object> ansTs = createTransitionSystem();
 		List<String> inputs = c.getInputPortNames();
 		List<String> registers = c.getRegisterNames();
 		List<String> outputs = c.getOutputPortNames();
 		addToAtomicPropositions(inputs, ansTs);
 		addToAtomicPropositions(registers, ansTs);
 		addToAtomicPropositions(outputs, ansTs);
-
 		genStatesAndLabels(c, ansTs, inputs, registers, outputs);
-
-		Set<List<Boolean>> boolInputs = namesToBooleans(c.getInputPortNames(), c.getInputPortNames().size());
-		List <Boolean> initReg = new ArrayList<Boolean>(Collections.nCopies(registers.size(), false));
-		addInitialStateToTs(boolInputs, initReg, ansTs);
+		Set<List<Boolean>> boolInputs = namesToBooleans(inputs, inputs.size());
+		addInitialStateToTs(boolInputs, registers, ansTs);
 		addActionsToTs(boolInputs, ansTs);
 		addTransitionsToTs(c, ansTs);
-
 		removeUnreachableStates(ansTs);
 		return ansTs;
 	}
@@ -415,7 +412,7 @@ public class FvmFacadeImpl implements FvmFacade {
 							Map<String, Object> eval = new LinkedHashMap<>();
 							eval = ActionDef.effect(actionDefs, state.getSecond(), action);
 							if (eval != null){
-								Pair<L, Map<String, Object>> buildState = new Pair(toState, eval);
+								Pair<L, Map<String, Object>> buildState = new Pair<L, Map<String, Object>>(toState, eval);
 								ts.addAction(action);
 								ts.addState(buildState);
 								ts.addAtomicProposition(toState);
@@ -449,7 +446,7 @@ public class FvmFacadeImpl implements FvmFacade {
 					eval = ActionDef.effect(actionDefs, eval, init);
 				}
 
-				Pair<L, Map<String, Object>> buildState = new Pair(loc, eval);
+				Pair<L, Map<String, Object>> buildState = new Pair<L, Map<String, Object>>(loc, eval);
 				ts.addState(buildState);
 				ts.addInitialState(buildState);
 				ts.addAtomicProposition(loc);
@@ -481,7 +478,7 @@ public class FvmFacadeImpl implements FvmFacade {
 
 	@Override
 	public <L, A> TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystemFromProgramGraph(ProgramGraph<L, A> pg, Set<ActionDef> actionDefs, Set<ConditionDef> conditionDefs) {
-		TransitionSystem ansTs = createTransitionSystem();
+		TransitionSystem<Pair<L, Map<String, Object>>, A, String> ansTs = createTransitionSystem();
 		Map<Pair<L, Map<String, Object>>, L> dynamicMapStates = new HashMap<>();
 		Set<L> initLocations = pg.getInitialLocations();
 		for (L loc : initLocations){
