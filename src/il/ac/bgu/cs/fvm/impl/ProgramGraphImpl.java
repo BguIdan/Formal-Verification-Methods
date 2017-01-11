@@ -13,8 +13,9 @@ public class ProgramGraphImpl<L, A> implements ProgramGraph<L, A> {
  	**** Private members ****
  ******************************/
 	String pgName;
-	Set<L>	locations;
-	Set<L>	initLocations;
+	Set<List<String>> initialList; 
+	Set<L> locations;
+	Set<L> initLocations;
 	Set<A> actions;
 	Set<PGTransition<L,A>> pgTransitions;
 
@@ -23,6 +24,7 @@ public class ProgramGraphImpl<L, A> implements ProgramGraph<L, A> {
  ******************************/
 	public ProgramGraphImpl() {
 		this.pgName = "";
+		this.initialList = new HashSet<>();
 		this.locations = new HashSet<L>();
 		this.initLocations = new HashSet<L>();
 		this.actions = new HashSet<A>();
@@ -35,7 +37,7 @@ public class ProgramGraphImpl<L, A> implements ProgramGraph<L, A> {
  ******************************/
 	@Override
 	public void addInitalization(List<String> init) {
-		// TODO Auto-generated method stub
+		initialList.add(init);
 		
 	}
 
@@ -56,8 +58,7 @@ public class ProgramGraphImpl<L, A> implements ProgramGraph<L, A> {
 
 	@Override
 	public Set<List<String>> getInitalizations() {
-		// TODO Auto-generated method stub
-		return null;
+		return new HashSet<>(initialList);
 	}
 
 	@Override
