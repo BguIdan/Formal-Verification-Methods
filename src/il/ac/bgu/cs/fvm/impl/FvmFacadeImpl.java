@@ -456,7 +456,7 @@ public class FvmFacadeImpl implements FvmFacade {
 
 	@Override
 	public <L1, L2, A> ProgramGraph<Pair<L1, L2>, A> interleave(ProgramGraph<L1, A> pg1, ProgramGraph<L2, A> pg2) {
-		throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement interleave
+		return FvmFacadeHelper.getInstance().interleavePGs(pg1,pg2);
 	}
 
 	private void addToAtomicPropositions(List<String> toAdd, TransitionSystem<Pair<List<Boolean>, List<Boolean>>, List<Boolean>, Object> ts){
@@ -602,9 +602,7 @@ public class FvmFacadeImpl implements FvmFacade {
 
 	private <L, A> void createInitialStates(Set<ActionDef> actionDefs, Set<ConditionDef> conditionDefs, TransitionSystem ts,
 			ProgramGraph<L, A> pg, Map<Pair<L, Map<String, Object>>, L> dynamicMapStates, L loc){
-		//Set<L> initLocations = pg.getInitialLocations();
 		Set<List<String>> initializationsSet = pg.getInitalizations();
-		//for(L loc : initLocations){
 		for(List<String> initializations : initializationsSet) {
 			Map<String, Object> eval = new LinkedHashMap<>();
 			for(String init : initializations)
@@ -625,21 +623,17 @@ public class FvmFacadeImpl implements FvmFacade {
 				ts.addToLabel(buildState,atomic);
 			}
 		}
-		//}
 	}
 
 	private <L, A> void createInitialStateWhileEmptyInitList(Set<ActionDef> actionDefs, Set<ConditionDef> conditionDefs, TransitionSystem ts, 
 			ProgramGraph<L, A> pg, Map<Pair<L, Map<String, Object>>, L> dynamicMapStates, L loc){
-		//Set<L> initLocations = pg.getInitialLocations();
-		//for (L loc : initLocations){
 		Map<String, Object> mapVarToVAlForState = new HashMap<String, Object>();
 		Pair<L, Map<String, Object>> buildState = new Pair(loc, mapVarToVAlForState);
 		ts.addState(buildState);
 		ts.addInitialState(buildState);
 		ts.addToLabel(buildState,loc);
 		ts.addAtomicProposition(loc);
-		dynamicMapStates.put(buildState,loc);
-		//}    
+		dynamicMapStates.put(buildState,loc);   
 	}
 
 	@Override
@@ -660,22 +654,22 @@ public class FvmFacadeImpl implements FvmFacade {
 
 	@Override
 	public <L, A> TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> transitionSystemFromChannelSystem(ChannelSystem<L, A> cs) {
-		throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement transitionSystemFromChannelSystem
+		return FvmFacadeHelper.getInstance().TSfromChannelSystem(cs);
 	}
 
 	@Override
 	public ProgramGraph<String, String> programGraphFromNanoPromela(String filename) throws Exception {
-		throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement programGraphFromNanoPromela
+		return FvmFacadeHelper.getInstance().PGfromNanoPromela(filename);
 	}
 
 	@Override
 	public ProgramGraph<String, String> programGraphFromNanoPromelaString(String nanopromela) throws Exception {
-		throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement programGraphFromNanoPromelaString
+		return  FvmFacadeHelper.getInstance().PGfromNanoPromelaString(nanopromela);
 	}
 
 	@Override
 	public ProgramGraph<String, String> programGraphFromNanoPromela(InputStream inputStream) throws Exception {
-		throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement programGraphFromNanoPromela
+		return FvmFacadeHelper.getInstance().PGfromNanoPromela(inputStream);
 	}
 
 	/*******************************************************
