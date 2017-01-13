@@ -273,14 +273,180 @@ public class FvmFacadeImpl implements FvmFacade {
 		}
 	}
 
+	private <S1, S2, A, P> void addLabelingToStates(Set<P> lablesMap,Pair<S1, S2> interState, TransitionSystem<Pair<S1, S2>, A, P> ts){
+		for(P p : lablesMap){
+			ts.addToLabel(interState, p);
+		}
+	}
+
+	private <S1, S2, A, P> void createStatesWithLabeling(TransitionSystem<S1, A, P> ts1, TransitionSystem<S2, A, P> ts2, 
+			Map<S1, Map<S2,Pair<S1,S2>>> dynamicMapStatesS1Leads, Map<S2, Map<S1,Pair<S1,S2>>> dynamicMapStatesS2Leads, TransitionSystem<Pair<S1, S2>, A, P> ts){
+		Set<S1> initialsS1 = ts1.getInitialStates();
+		Set<S2> initialsS2 = ts2.getInitialStates();
+		Map<S1, Set<P>> labelingS1 = ts1.getLabelingFunction();
+		Map<S2, Set<P>> labelingS2 = ts2.getLabelingFunction();
+		Set<S1> statesS1 = ts1.getStates();
+		Set<S2> statesS2 = ts2.getStates();
+		for(S1 state1 : statesS1){
+			for(S2 state2 : statesS2){
+				Pair<S1, S2> interState = new Pair<S1, S2>(state1, state2);
+				ts.addState(interState);
+				// if both initial states in their ts's
+				if(initialsS1.contains(state1) && initialsS2.contains(state2)){
+					ts.addInitialState(interState);
+				}
+				addLabelingToStates(labelingS1.get(state1), interState, ts);
+				addLabelingToStates(labelingS2.get(state2), interState, ts);
+				// Add the new state to map of states while Key = S1->S2 value = new state
+				Map<S2,Pair<S1,S2>> s2MapForS1LeadsDynamicMap = dynamicMapStatesS1Leads.get(state1);
+				if (s2MapForS1LeadsDynamicMap == null) {
+					s2MapForS1LeadsDynamicMap = new HashMap<>();
+					dynamicMapStatesS1Leads.put(state1, s2MapForS1LeadsDynamicMap);
+				}
+				s2MapForS1LeadsDynamicMap.put(state2, interState);
+				// Add the new state to map of states while Key = S2->S1 value = new state
+				Map<S1,Pair<S1,S2>> s1MapForS2LeadsDynamicMap = dynamicMapStatesS2Leads.get(state2);
+				if (s1MapForS2LeadsDynamicMap == null) {
+					s1MapForS2LeadsDynamicMap = new HashMap<>();
+					dynamicMapStatesS2Leads.put(state2, s1MapForS2LeadsDynamicMap);
+				}
+				s1MapForS2LeadsDynamicMap.put(state1, interState);
+			}
+		}
+	}
+
+	private <S1, S2, S, A, P> void addAtomics(TransitionSystem<S, A, P> tsi, TransitionSystem<Pair<S1, S2>, A, P> ts){
+		Set<P> atomicpS = tsi.getAtomicPropositions();
+		for (P ap : atomicpS){
+			ts.addAtomicProposition(ap);
+		}
+	}
+
+	private <S1, S2, S, A, P> void addActions(TransitionSystem<S, A, P> tsi, TransitionSystem<Pair<S1, S2>, A, P> ts){
+		Set<A> actions = tsi.getActions();
+		for (A action : actions){
+			ts.addAction(action);
+		}
+	}
+
+	private <S1, S2, A, P> void handleTranstions1(Set<Transition<S1,A>> ts1_Transtions, Set<Transition> ts1_handShakeTranstions,
+			Set<A> handShakingActions, Map<S1, Map<S2,Pair<S1,S2>>> dynamicMapStatesS1Leads, TransitionSystem<Pair<S1, S2>, A, P> ts){
+		for (Transition transtion1 : ts1_Transtions) {
+			S1 state1From = (S1)transtion1.getFrom();
+			S1 state1To = (S1)transtion1.getTo();
+			A action1 = (A)transtion1.getAction();
+			if(!handShakingActions.contains(action1)){
+				Map<S2, Pair<S1, S2>> mapS2KeysPairValsFromState = dynamicMapStatesS1Leads.get(state1From);
+				if(mapS2KeysPairValsFromState == null){
+					mapS2KeysPairValsFromState = new HashMap<>();
+					dynamicMapStatesS1Leads.put(state1From, mapS2KeysPairValsFromState);
+				}
+				Map<S2, Pair<S1, S2>> mapS2KeysPairValsToState = dynamicMapStatesS1Leads.get(state1To);
+				if(mapS2KeysPairValsToState == null){
+					mapS2KeysPairValsToState = new HashMap<>();
+					dynamicMapStatesS1Leads.put(state1To, mapS2KeysPairValsToState);
+				}
+				// loop over the map keys in order to generate transitions
+				for(S2 state : mapS2KeysPairValsFromState.keySet()){
+					Pair<S1,S2> currState = mapS2KeysPairValsFromState.get(state);
+					Pair<S1, S2> nextState = mapS2KeysPairValsToState.get(state);
+					Transition transitionToAdd = new Transition(currState, action1, nextState);
+					ts.addTransition(transitionToAdd);
+				}
+			}
+			else{
+				ts1_handShakeTranstions.add(transtion1);
+			}
+		}
+	}
+
+	private <S1, S2, A, P> void handleTranstions2(Set<Transition<S2,A>> ts2_Transtions, Set<Transition> ts2_handShakeTranstions,
+			Set<A> handShakingActions, Map<S2, Map<S1,Pair<S1,S2>>> dynamicMapStatesS2Leads, TransitionSystem<Pair<S1, S2>, A, P> ts){
+		for (Transition transtion2 : ts2_Transtions) {
+			S2 state2From = (S2)transtion2.getFrom();
+			S2 state2To = (S2)transtion2.getTo();
+			A action2 = (A)transtion2.getAction();
+			if(!handShakingActions.contains(action2)) {
+				Map<S1, Pair<S1, S2>> mapS1KeysPairValsFromState = dynamicMapStatesS2Leads.get(state2From);
+				if(mapS1KeysPairValsFromState == null){
+					mapS1KeysPairValsFromState = new HashMap<>();
+					dynamicMapStatesS2Leads.put(state2From, mapS1KeysPairValsFromState);
+				}
+				Map<S1, Pair<S1, S2>> mapS1KeysPairValsToState = dynamicMapStatesS2Leads.get(state2To);
+				if(mapS1KeysPairValsToState == null){
+					mapS1KeysPairValsToState = new HashMap<>();
+					dynamicMapStatesS2Leads.put(state2To, mapS1KeysPairValsToState);
+				}
+				// loop over the map keys in order to generate transitions
+				for(S1 state : mapS1KeysPairValsFromState.keySet()){
+					Pair<S1,S2> currState = mapS1KeysPairValsFromState.get(state);
+					Pair<S1, S2> nextState = mapS1KeysPairValsToState.get(state);
+					Transition transitionToAdd = new Transition(currState, action2, nextState);
+					ts.addTransition(transitionToAdd);
+				}
+			}
+			else{
+				ts2_handShakeTranstions.add(transtion2);
+			}
+		}
+	}
+
+	private <S1, S2, A, P> void addTransitions(TransitionSystem<S1, A, P> ts1,TransitionSystem<S2, A, P> ts2, Set<A> handShakingActions,
+			Map<S1, Map<S2,Pair<S1,S2>>> dynamicMapStatesS1Leads, Map<S2, Map<S1,Pair<S1,S2>>> dynamicMapStatesS2Leads, TransitionSystem<Pair<S1, S2>, A, P> ts){
+		Set<Transition<S1,A>> ts1_Transtions = ts1.getTransitions();
+		Set<Transition<S2,A>> ts2_Transtions = ts2.getTransitions();
+		Set<Transition> ts1_handShakeTranstions = new HashSet<>();
+		Set<Transition> ts2_handShakeTranstions = new HashSet<>();
+		handleTranstions1(ts1_Transtions, ts1_handShakeTranstions, handShakingActions, dynamicMapStatesS1Leads, ts);
+		handleTranstions2(ts2_Transtions, ts2_handShakeTranstions, handShakingActions, dynamicMapStatesS2Leads, ts);
+		for (Transition handShake1 : ts1_handShakeTranstions) {
+			for (Transition handShake2 : ts2_handShakeTranstions) {
+				S1 state1From = (S1)handShake1.getFrom();
+				S1 state1To = (S1)handShake1.getTo();
+				A action1 = (A)handShake1.getAction();
+				S2 state2From = (S2)handShake2.getFrom();
+				S2 state2To = (S2)handShake2.getTo();
+				A action2 = (A)handShake2.getAction();
+				// generate transition only if both transitions have the same action 
+				if(action1.equals(action2)){
+					Map<S2, Pair<S1, S2>> mapS2KeysPairValsFromState = dynamicMapStatesS1Leads.get(state1From);
+					if(mapS2KeysPairValsFromState == null){
+						mapS2KeysPairValsFromState = new HashMap<>();
+						dynamicMapStatesS1Leads.put(state1From, mapS2KeysPairValsFromState);
+					}
+					Map<S2, Pair<S1, S2>> mapS2KeysPairValsToState = dynamicMapStatesS1Leads.get(state1To);
+					if(mapS2KeysPairValsToState == null){
+						mapS2KeysPairValsToState = new HashMap<>();
+						dynamicMapStatesS1Leads.put(state1To, mapS2KeysPairValsToState);
+					}
+					Pair<S1, S2> currState = mapS2KeysPairValsFromState.get(state2From);
+					Pair<S1, S2> nextState = mapS2KeysPairValsToState.get(state2To);
+					Transition transitionToAdd = new Transition(currState, action1, nextState);
+					ts.addTransition(transitionToAdd);
+				}
+			}
+		}
+	}
+
 	@Override
 	public <S1, S2, A, P> TransitionSystem<Pair<S1, S2>, A, P> interleave(TransitionSystem<S1, A, P> ts1, TransitionSystem<S2, A, P> ts2) {
-		throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement interleave
+		return interleave(ts1, ts2, new HashSet<A>());
 	}
 
 	@Override
 	public <S1, S2, A, P> TransitionSystem<Pair<S1, S2>, A, P> interleave(TransitionSystem<S1, A, P> ts1, TransitionSystem<S2, A, P> ts2, Set<A> handShakingActions) {
-		throw new UnsupportedOperationException("Not supported yet."); // TODO: Implement interleave
+		TransitionSystem<Pair<S1, S2>, A, P> ansTs = createTransitionSystem();
+		Map<S1, Map<S2,Pair<S1,S2>>> dynamicMapStatesS1Leads = new HashMap<>();
+		Map<S2, Map<S1,Pair<S1,S2>>> dynamicMapStatesS2Leads = new HashMap<>();
+		addAtomics(ts1, ansTs);
+		addAtomics(ts2, ansTs);
+		addActions(ts1, ansTs);
+		addActions(ts2, ansTs);
+		createStatesWithLabeling(ts1, ts2, dynamicMapStatesS1Leads, dynamicMapStatesS2Leads, ansTs);
+		addTransitions(ts1, ts2, handShakingActions, dynamicMapStatesS1Leads, dynamicMapStatesS2Leads, ansTs);
+
+		removeUnreachableStates(ansTs);
+		return ansTs;
 	}
 
 	@Override
@@ -439,26 +605,26 @@ public class FvmFacadeImpl implements FvmFacade {
 		//Set<L> initLocations = pg.getInitialLocations();
 		Set<List<String>> initializationsSet = pg.getInitalizations();
 		//for(L loc : initLocations){
-			for(List<String> initializations : initializationsSet) {
-				Map<String, Object> eval = new LinkedHashMap<>();
-				for(String init : initializations)
-				{
-					eval = ActionDef.effect(actionDefs, eval, init);
-				}
-
-				Pair<L, Map<String, Object>> buildState = new Pair<L, Map<String, Object>>(loc, eval);
-				ts.addState(buildState);
-				ts.addInitialState(buildState);
-				ts.addAtomicProposition(loc);
-				ts.addToLabel(buildState,loc);
-				dynamicMapStates.put(buildState,loc);
-				for(Map.Entry<String, Object> mapEntry : eval.entrySet())
-				{
-					String atomic = mapEntry.getKey() + " = " + mapEntry.getValue();
-					ts.addAtomicProposition(atomic);
-					ts.addToLabel(buildState,atomic);
-				}
+		for(List<String> initializations : initializationsSet) {
+			Map<String, Object> eval = new LinkedHashMap<>();
+			for(String init : initializations)
+			{
+				eval = ActionDef.effect(actionDefs, eval, init);
 			}
+
+			Pair<L, Map<String, Object>> buildState = new Pair<L, Map<String, Object>>(loc, eval);
+			ts.addState(buildState);
+			ts.addInitialState(buildState);
+			ts.addAtomicProposition(loc);
+			ts.addToLabel(buildState,loc);
+			dynamicMapStates.put(buildState,loc);
+			for(Map.Entry<String, Object> mapEntry : eval.entrySet())
+			{
+				String atomic = mapEntry.getKey() + " = " + mapEntry.getValue();
+				ts.addAtomicProposition(atomic);
+				ts.addToLabel(buildState,atomic);
+			}
+		}
 		//}
 	}
 
@@ -466,13 +632,13 @@ public class FvmFacadeImpl implements FvmFacade {
 			ProgramGraph<L, A> pg, Map<Pair<L, Map<String, Object>>, L> dynamicMapStates, L loc){
 		//Set<L> initLocations = pg.getInitialLocations();
 		//for (L loc : initLocations){
-			Map<String, Object> mapVarToVAlForState = new HashMap<String, Object>();
-			Pair<L, Map<String, Object>> buildState = new Pair(loc, mapVarToVAlForState);
-			ts.addState(buildState);
-			ts.addInitialState(buildState);
-			ts.addToLabel(buildState,loc);
-			ts.addAtomicProposition(loc);
-			dynamicMapStates.put(buildState,loc);
+		Map<String, Object> mapVarToVAlForState = new HashMap<String, Object>();
+		Pair<L, Map<String, Object>> buildState = new Pair(loc, mapVarToVAlForState);
+		ts.addState(buildState);
+		ts.addInitialState(buildState);
+		ts.addToLabel(buildState,loc);
+		ts.addAtomicProposition(loc);
+		dynamicMapStates.put(buildState,loc);
 		//}    
 	}
 
